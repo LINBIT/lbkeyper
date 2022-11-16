@@ -227,6 +227,8 @@ func (s *server) errorf(code int, remoteAddr string, w http.ResponseWriter, form
 
 func expandUsers(usersWithGroups []string, groups map[string]Group) ([]string, error) {
 	users := make([]string, 0, len(usersWithGroups))
+
+	userSet := make(map[string]struct{})
 	for _, user := range usersWithGroups {
 		if strings.HasPrefix(user, "@") {
 			groupUsers, ok := groups[user[1:]]
@@ -235,10 +237,15 @@ func expandUsers(usersWithGroups []string, groups map[string]Group) ([]string, e
 			}
 			for _, groupUser := range groupUsers.Members {
 				users = append(users, groupUser)
+				userSet[groupUser] = struct{}{}
 			}
 		} else {
-			users = append(users, user)
+			userSet[user] = struct{}{}
 		}
+	}
+
+	for user := range userSet {
+		users = append(users, user)
 	}
 
 	return users, nil
