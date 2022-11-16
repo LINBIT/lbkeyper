@@ -1,0 +1,28 @@
+[users]
+[users.alice]
+keys = [
+  "https://internal.gitlab.company/alice.keys",
+  "ssh-ed25519 AAAAC3NzaC... alice@laptop"
+]
+
+[users.bob]
+keys = [ "https://github.com/bob.keys" ]
+
+[users.charlie]
+keys = [ "https://github.com/charlie.keys" ]
+
+
+[groups]
+[groups.admins]
+members = [ "alice", "charlie" ]
+
+[groups.pkgmaintainers]
+members = [ "alice", "bob" ]
+
+[servers]
+[servers.www]
+root = [ "@admins" ]
+uploader = [ "@pkgmaintainers" ]
+
+[servers.builder]
+build = [ "@pkgmaintainers", "charlie" ]
