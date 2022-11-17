@@ -37,5 +37,5 @@ deploy:
     name: docker.io/bitnami/kubectl:latest
     entrypoint: [""]
   script:
-    - kubectl set image deploy/lbkeyper lbkeyper=$(cat image-id)
+    - kubectl set image deploy/lbkeyper lbkeyper=$(tail -n1 image-id)
     - kubectl rollout status deploy/lbkeyper
