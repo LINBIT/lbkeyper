@@ -1,0 +1,24 @@
+stages:
+  - build
+
+workflow:
+  rules:
+    - if: $CI_MERGE_REQUEST_ID
+    - if: $CI_COMMIT_BRANCH == 'master'
+    - if: $CI_COMMIT_TAG
+
+build:
+  variables:
+    IMAGE: $LINBIT_DOCKER_REGISTRY/lbkeyper
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [ "" ]
+  script:
+    - set -ex
+    - mkdir -p /kaniko/.docker
+    - ln -snf "$DOCKER_AUTH_CONFIG_FILE" /kaniko/.docker/config.json
+    - DESTINATION_ARG="--destination $IMAGE:$CI_COMMIT_REF_SLUG"
+    - if [ "$CI_COMMIT_BRANCH" == "master" ]; then DESTINATION_ARG="$DESTINATION_ARG --destination $IMAGE:latest" ; fi
+    - if [ -n "$CI_COMMIT_TAG" ]; then DESTINATION_ARG="$DESTINATION_ARG --destination $IMAGE:$CI_COMMIT_TAG" ; fi
+    - /kaniko/executor --registry-mirror $DOCKER_REGISTRY_MIRROR --dockerfile $CI_PROJECT_DIR/Dockerfile --context $CI_PROJECT_DIR --cache $DESTINATION_ARG
