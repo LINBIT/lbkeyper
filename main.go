@@ -248,7 +248,6 @@ func expandUsers(usersWithGroups []string, groups map[string]Group) ([]string, e
 				return users, fmt.Errorf("Could not find users for group %s", user)
 			}
 			for _, groupUser := range groupUsers.Members {
-				users = append(users, groupUser)
 				userSet[groupUser] = struct{}{}
 			}
 		} else {
