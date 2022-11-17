@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -258,6 +259,7 @@ func expandUsers(usersWithGroups []string, groups map[string]Group) ([]string, e
 	for user := range userSet {
 		users = append(users, user)
 	}
+	sort.Strings(users)
 
 	return users, nil
 }
