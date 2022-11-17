@@ -18,7 +18,7 @@ import (
 
 type config struct {
 	Users   map[string]User
-	Servers map[string]ServerUsers
+	Servers map[string]Server
 	Groups  map[string]Group
 }
 
@@ -27,7 +27,10 @@ type User struct {
 	expandedKeys []string
 }
 
-type ServerUsers map[string][]string
+type Server struct {
+	Users    map[string][]string
+	Mapusers bool
+}
 
 type Group struct {
 	Members []string
@@ -164,10 +167,19 @@ func (s *server) getKeys() http.HandlerFunc {
 
 		// from here on we don't want to error out:
 		// if we return successful (but empty), this will clean the cache for users that got rotated out (see authsh)
-		users, ok := server[username]
+		users, ok := server.Users[username]
 		if !ok {
-			s.logger.Error(fmt.Sprintf("No entry for user '%s' on server '%s'", username, hostname))
-			return
+			if !server.Mapusers { // we are done here
+				s.logger.Error(fmt.Sprintf("No entry for user '%s' on server '%s'", username, hostname))
+				return
+			}
+			// check for mapped user
+			_, ok := s.conf.Users[username]
+			if !ok {
+				s.logger.Error(fmt.Sprintf("No entry for mapped user '%s' on server '%s'", username, hostname))
+				return
+			}
+			users = []string{username}
 		}
 
 		users, err := expandUsers(users, s.conf.Groups)
@@ -279,6 +291,8 @@ test -f "${CACHEFILE}" && cat "${CACHEFILE}"
 # AuthorizedKeysCommand /etc/ssh/auth.sh
 # AuthorizedKeysCommandUser root  # or some dedicated user, however you feel like, but take care of the cache and other perms
 # # AuthorizedKeysFile none  # optional, but most likely a good idea...
+# # PermitRootLogin prohibit-password  # optional, but most likely a good idea...
+# # PasswordAuthentication no  # optional, but most likely a good idea...
 `
 	return authsh
 }

@@ -20,9 +20,11 @@ members = [ "alice", "charlie" ]
 members = [ "alice", "bob" ]
 
 [servers]
-[servers.www]
+[servers.www.users]
 root = [ "@admins" ]
 uploader = [ "@pkgmaintainers" ]
 
 [servers.builder]
+mapusers = true  # this allows non specified users to log in as well (e.g., alice@builder)
+[servers.builder.users]
 build = [ "@pkgmaintainers", "charlie" ]
