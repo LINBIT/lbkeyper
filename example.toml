@@ -1,7 +1,7 @@
 [users]
 [users.alice]
 keys = [
-  "https://internal.gitlab.company/alice.keys",
+  "https://gitlab.acme.com/alice.keys",
   "ssh-ed25519 AAAAC3NzaC... alice@laptop"
 ]
 
