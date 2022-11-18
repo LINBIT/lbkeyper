@@ -151,18 +151,18 @@ func (s *server) getKeys() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		hostname, ok := mux.Vars(r)["host"]
 		if !ok {
-			s.errorf(http.StatusBadRequest, r.RemoteAddr, w, "Could not get 'host' parameter")
+			s.errorf(http.StatusBadRequest, r.RemoteAddr, w, "# Could not get 'host' parameter")
 			return
 		}
 		username, ok := mux.Vars(r)["user"]
 		if !ok {
-			s.errorf(http.StatusBadRequest, r.RemoteAddr, w, "Could not get 'user' parameter")
+			s.errorf(http.StatusBadRequest, r.RemoteAddr, w, "# Could not get 'user' parameter")
 			return
 		}
 
 		server, ok := s.conf.Servers[hostname]
 		if !ok {
-			s.errorf(http.StatusBadRequest, r.RemoteAddr, w, "No entry for hostname '%s'", hostname)
+			s.errorf(http.StatusBadRequest, r.RemoteAddr, w, "# No entry for hostname '%s'", hostname)
 			return
 		}
 
