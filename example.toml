@@ -12,19 +12,19 @@ keys = [ "https://github.com/bob.keys" ]
 keys = [ "https://github.com/charlie.keys" ]
 
 
-[groups]
-[groups.admins]
+[usergroups.admins]
 members = [ "alice", "charlie" ]
 
-[groups.pkgmaintainers]
+[usergroups.pkgmaintainers]
 members = [ "alice", "bob" ]
-
-[servers]
-[servers.www.users]
-root = [ "@admins" ]
-uploader = [ "@pkgmaintainers" ]
 
 [servers.builder]
 mapusers = true  # this allows non specified users to log in as well (e.g., alice@builder)
 [servers.builder.users]
 build = [ "@pkgmaintainers", "charlie" ]
+
+[servergroups.www]
+members = [ "www", "www2", "www3" ]
+[servergroups.www.users]
+root = [ "@admins" ]
+uploader = [ "@pkgmaintainers" ]

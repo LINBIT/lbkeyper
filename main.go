@@ -18,9 +18,10 @@ import (
 )
 
 type config struct {
-	Users   map[string]User
-	Servers map[string]Server
-	Groups  map[string]Group
+	Users        map[string]User
+	Servers      map[string]Server
+	UserGroups   map[string]UserGroup
+	ServerGroups map[string]ServerGroup
 }
 
 type User struct {
@@ -33,8 +34,13 @@ type Server struct {
 	Mapusers bool
 }
 
-type Group struct {
+type UserGroup struct {
 	Members []string
+}
+
+type ServerGroup struct {
+	Members []string
+	Server
 }
 
 type server struct {
@@ -92,6 +98,15 @@ func main() {
 	for username, user := range s.conf.Users {
 		user.expandedKeys = make([]string, len(user.Keys))
 		s.conf.Users[username] = user
+	}
+	// expand server groups
+	for groupname, group := range s.conf.ServerGroups {
+		for _, member := range group.Members {
+			if _, ok := s.conf.Servers[member]; ok {
+				log.Fatalf("server '%s' already exists, but is also member of servergroup '%s'", member, groupname)
+			}
+			s.conf.Servers[member] = Server{Users: group.Users, Mapusers: group.Mapusers}
+		}
 	}
 
 	s.routes()
@@ -183,7 +198,7 @@ func (s *server) getKeys() http.HandlerFunc {
 			users = []string{username}
 		}
 
-		users, err := expandUsers(users, s.conf.Groups)
+		users, err := expandUsers(users, s.conf.UserGroups)
 		if err != nil {
 			s.logger.Error(fmt.Sprintf("Could not expand users: %v", err))
 			return
@@ -238,7 +253,7 @@ func (s *server) errorf(code int, remoteAddr string, w http.ResponseWriter, form
 		zap.Int("code", code))
 }
 
-func expandUsers(usersWithGroups []string, groups map[string]Group) ([]string, error) {
+func expandUsers(usersWithGroups []string, groups map[string]UserGroup) ([]string, error) {
 	users := make([]string, 0, len(usersWithGroups))
 
 	userSet := make(map[string]struct{})
