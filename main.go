@@ -146,6 +146,9 @@ func (s *server) updateKeys() {
 				if err != nil {
 					s.logger.Error(fmt.Sprintf("Could not get '%s' for user '%s'", key, username))
 					continue // ignore, but keep the old one "cached"
+				} else if resp.StatusCode < 200 || resp.StatusCode >= 300 { // check late, we want Body to be closed
+					s.logger.Error(fmt.Sprintf("Could not get '%s' for user '%s', status not successful: %s", key, username, resp.Status))
+					continue // ignore, but keep the old one "cached"
 				}
 				s.conf.Users[username].expandedKeys[i] = strings.TrimSpace(string(body))
 			} else {
