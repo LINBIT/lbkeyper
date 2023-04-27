@@ -287,19 +287,18 @@ func script(url string) string {
 	authsh += `USER="$1"
 CACHE=/run/sshd/lbkeyper
 CACHEFILE="${CACHE}/${USER}"
-TMPFILE="${CACHEFILE}.tmp"
 HOST="$(hostname)"
 
 mkdir -p "$CACHE"  # some minimal cache if KEYPER_SERVER is not accessible
+TMPFILE="$(mktemp -p "$CACHE")" || { cat "${CACHEFILE}"; exit; }
+trap "rm -f -- '$TMPFILE'" EXIT
 if curl -q -s -f -m 5 "${KEYPER_SERVER}/api/v1/keys/${HOST}/${USER}" > "$TMPFILE"; then
    if [ -s "${TMPFILE}" ]; then
       mv "${TMPFILE}" "${CACHEFILE}"
    else
-      rm "${CACHEFILE}"  # user got removed
+      rm -f "${CACHEFILE}"  # user got removed
    fi
 fi
-# always remove the TMPFILE, so that users can not create tons of files for invalid users
-rm -f "${TMPFILE}"  # might have been moved already
 test -f "${CACHEFILE}" && cat "${CACHEFILE}"
 
 ### CONFIGURATION
