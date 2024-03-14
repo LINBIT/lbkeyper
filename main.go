@@ -8,12 +8,15 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/BurntSushi/toml"
 	"github.com/gorilla/mux"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"go.uber.org/zap"
 )
 
@@ -125,6 +128,13 @@ func main() {
 	}
 }
 
+var (
+	keysRequestsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "lbkeyper_keys_requests_total",
+		Help: "Total requests for keys",
+	}, []string{"code", "host", "user"})
+)
+
 // handler interface
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.router.ServeHTTP(w, r)
@@ -169,20 +179,25 @@ func (s *server) getKeys() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		hostname, ok := mux.Vars(r)["host"]
 		if !ok {
+			keysRequestsTotal.WithLabelValues(strconv.FormatInt(http.StatusBadRequest, 10), "", "").Inc()
 			s.errorf(http.StatusBadRequest, r.RemoteAddr, w, "# Could not get 'host' parameter")
 			return
 		}
 		username, ok := mux.Vars(r)["user"]
 		if !ok {
+			keysRequestsTotal.WithLabelValues(strconv.FormatInt(http.StatusBadRequest, 10), hostname, "").Inc()
 			s.errorf(http.StatusBadRequest, r.RemoteAddr, w, "# Could not get 'user' parameter")
 			return
 		}
 
 		server, ok := s.conf.Servers[hostname]
 		if !ok {
+			keysRequestsTotal.WithLabelValues(strconv.FormatInt(http.StatusBadRequest, 10), hostname, username).Inc()
 			s.errorf(http.StatusBadRequest, r.RemoteAddr, w, "# No entry for hostname '%s'", hostname)
 			return
 		}
+
+		defer keysRequestsTotal.WithLabelValues(strconv.FormatInt(http.StatusOK, 10), hostname, username)
 
 		// from here on we don't want to error out:
 		// if we return successful (but empty), this will clean the cache for users that got rotated out (see authsh)
