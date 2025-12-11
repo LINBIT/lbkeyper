@@ -76,7 +76,7 @@ After writing the config and starting the daemon, we assume `https://lbkeyper.ac
 `curl https://lbkeyper.acme.com/api/v1/hello`. This should be successful and return the commit hash of the
 running daemon.
 
-The next step would be a sample query like `curl https://lbkeyper.acme.com/api/v1/builder/charlie`, which
+The next step would be a sample query like `curl -L https://lbkeyper.acme.com/api/v1/keys/builder/charlie`, which
 should return Charlie's public keys.
 
 Finally one would integrate it on a host like "builder":
