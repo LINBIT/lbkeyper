@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"flag"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"text/template"
 	"time"
 
 	"github.com/BurntSushi/toml"
@@ -51,38 +53,57 @@ type server struct {
 	logger *zap.Logger
 	conf   config
 	url    string
+	tpl    *template.Template
 
 	m sync.RWMutex
 }
 
 var GitCommit string
 
+//go:embed templates
+var templates embed.FS
+
 var (
-	flagAddr       = flag.String("addr", ":8080", "Server address")
-	flagUrl        = flag.String("url", "http://localhost:8080", "Server url")
-	flagKeyFetch   = flag.Duration("keyfetch", 5*time.Minute, "Online public key update interval")
-	flagCertFile   = flag.String("certfile", "", "Path to a TLS cert file")
-	flagKeyFile    = flag.String("keyfile", "", "Path to a TLS key file")
-	flagConfigFile = flag.String("config", "config.toml", "Path to toml config file")
-	flagVersion    = flag.Bool("version", false, "Print version and exit")
-	flagScript     = flag.Bool("script", false, "generate auth.sh and exit")
+	flagAddr        = flag.String("addr", ":8080", "Server address")
+	flagUrl         = flag.String("url", "http://localhost:8080", "Server url")
+	flagKeyFetch    = flag.Duration("keyfetch", 5*time.Minute, "Online public key update interval")
+	flagCertFile    = flag.String("certfile", "", "Path to a TLS cert file")
+	flagKeyFile     = flag.String("keyfile", "", "Path to a TLS key file")
+	flagConfigFile  = flag.String("config", "config.toml", "Path to toml config file")
+	flagVersion     = flag.Bool("version", false, "Print version and exit")
+	flagAuthScript  = flag.Bool("authScript", false, "generate auth.sh and exit")
+	flagSetupScript = flag.Bool("setupScript", false, "generate setup.sh and exit")
 )
 
 func main() {
 	flag.Parse()
 
+	tpl, err := template.ParseFS(templates, "templates/*")
+	if err != nil {
+		log.Fatalf("Could not parse templates: %s", err)
+	}
+
 	if *flagVersion {
 		fmt.Printf("Git-commit: '%s'\n", GitCommit)
 		os.Exit(0)
 	}
-	if *flagScript {
-		fmt.Println(script(*flagUrl))
+	if *flagAuthScript {
+		if err := authScript(tpl, os.Stdout, *flagUrl); err != nil {
+			log.Fatal(err)
+		}
+		os.Exit(0)
+	}
+	if *flagSetupScript {
+		if err := setupScript(tpl, os.Stdout, *flagUrl); err != nil {
+			log.Fatal(err)
+		}
 		os.Exit(0)
 	}
 
 	s := &server{
 		router: mux.NewRouter(),
 		url:    *flagUrl,
+		tpl:    tpl,
 	}
 	logger, err := zap.NewProduction()
 	if err != nil {
@@ -248,7 +269,19 @@ func (s *server) getKeys() http.HandlerFunc {
 
 func (s *server) authsh() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, script(s.url))
+		if err := authScript(s.tpl, w, s.url); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+}
+
+func (s *server) setupsh() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := setupScript(s.tpl, w, s.url); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 	}
 }
 
@@ -297,60 +330,10 @@ func expandUsers(usersWithGroups []string, groups map[string]UserGroup) ([]strin
 	return users, nil
 }
 
-func script(url string) string {
-	authsh := fmt.Sprintf("#!/bin/sh\n\nKEYPER_SERVER='%s'\n", url)
-	authsh += `USER="$1"
-CACHE=/run/sshd/lbkeyper
-CACHEFILE="${CACHE}/${USER}"
-HOST="$(hostname)"
+func authScript(t *template.Template, w io.Writer, url string) error {
+	return t.ExecuteTemplate(w, "auth.sh", map[string]string{"KeyperServer": url})
+}
 
-mkdir -p "$CACHE"  # some minimal cache if KEYPER_SERVER is not accessible
-TMPFILE="$(mktemp -p "$CACHE")" || { cat "${CACHEFILE}"; exit; }
-trap "rm -f -- '$TMPFILE'" EXIT
-if curl -q -s -f -m 5 "${KEYPER_SERVER}/api/v1/keys/${HOST}/${USER}" > "$TMPFILE"; then
-   if [ -s "${TMPFILE}" ]; then
-      mv "${TMPFILE}" "${CACHEFILE}"
-   else
-      rm -f "${CACHEFILE}"  # user got removed
-   fi
-fi
-test -f "${CACHEFILE}" && cat "${CACHEFILE}"
-
-### CONFIGURATION
-# - save this file to /etc/ssh/auth.sh
-# - chown root:root /etc/ssh/auth.sh
-# - chmod 700 /etc/ssh/auth.sh
-# - sshd_config(.d):
-# AuthorizedKeysCommand /etc/ssh/auth.sh
-# AuthorizedKeysCommandUser root  # or some dedicated user, however you feel like, but take care of the cache and other perms
-# # AuthorizedKeysFile none  # optional, but most likely a good idea...
-# # PermitRootLogin prohibit-password  # optional, but most likely a good idea...
-# # PasswordAuthentication no  # optional, but most likely a good idea...
-#
-# On systems with SELinux, you might need this policy module:
-#
-# module lbkeyper 1.0;
-#
-# require {
-# 	type var_run_t;
-# 	type http_port_t;
-# 	type sshd_t;
-# 	type hostname_exec_t;
-# 	class file { execute execute_no_trans map open read };
-# 	class dir create;
-# 	class tcp_socket name_connect;
-# }
-#
-# #============= sshd_t ==============
-# allow sshd_t hostname_exec_t:file { execute execute_no_trans open read };
-#
-# #!!!! This avc can be allowed using the boolean 'domain_can_mmap_files'
-# allow sshd_t hostname_exec_t:file map;
-#
-# #!!!! This avc can be allowed using one of the these booleans:
-# #     authlogin_yubikey, nis_enabled
-# allow sshd_t http_port_t:tcp_socket name_connect;
-# allow sshd_t var_run_t:dir create;
-`
-	return authsh
+func setupScript(t *template.Template, w io.Writer, url string) error {
+	return t.ExecuteTemplate(w, "setup.sh", map[string]string{"KeyperServer": url})
 }

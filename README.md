@@ -82,6 +82,12 @@ should return Charlie's public keys.
 Finally one would integrate it on a host like "builder":
 
 ```
+root@builder$ curl -fsSL https://lbkeyper.acme.com/setup.sh | bash -s
+```
+
+Alternatively, if automatic configuration fails or is undesired:
+
+```
 root@builder$ cd /etc/ssh
 root@builder$ curl https://lbkeyper.acme.com/auth.sh > auth.sh
 root@builder$ cat auth.sh to see the commented configuration options
