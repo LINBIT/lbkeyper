@@ -218,7 +218,7 @@ func (s *server) getKeys() http.HandlerFunc {
 			return
 		}
 
-		defer keysRequestsTotal.WithLabelValues(strconv.FormatInt(http.StatusOK, 10), hostname, username)
+		defer keysRequestsTotal.WithLabelValues(strconv.FormatInt(http.StatusOK, 10), hostname, username).Inc()
 
 		// from here on we don't want to error out:
 		// if we return successful (but empty), this will clean the cache for users that got rotated out (see authsh)
